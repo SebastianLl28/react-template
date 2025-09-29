@@ -1,14 +1,16 @@
 import { createBrowserRouter } from "react-router-dom";
-import NotFoundPage from "@/pages/NotFoundPage";
 import MainLayout from "../layouts/MainLayout";
-import ProductsPage from "@/features/products/pages/ProductsPage";
+import NotFoundPage from "@/pages/NotFoundPage";
+import authRoute from "@/features/auth/route";
+import productRoute from "@/features/products/route";
 
 export const router = createBrowserRouter([
   {
     element: <MainLayout />,
     children: [
       { index: true, element: <div>Home</div> },
-      { path: "/products", element: <ProductsPage /> },
+      ...productRoute,
+      ...authRoute,
       { path: "*", element: <NotFoundPage /> },
     ],
   },

@@ -1,0 +1,1 @@
+export const DEFAULT_EXPIRES_IN_MINS = 30;

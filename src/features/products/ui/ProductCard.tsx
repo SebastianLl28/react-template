@@ -4,19 +4,15 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/shared/ui/card";
-import { Button } from "@/shared/ui/button";
+} from "@/shared/components/ui/card";
+import { Button } from "@/shared/components/ui/button";
+import type { ProductVM } from "../model/ProductCardVM";
 
-type Props = {
-  product: {
-    id: number;
-    title: string;
-    price: number;
-    thumbnail?: string;
-  };
-};
+interface ProductCardProps {
+  product: ProductVM;
+}
 
-export function ProductCard({ product }: Props) {
+export function ProductCard({ product }: ProductCardProps) {
   return (
     <Card className="overflow-hidden">
       {product.thumbnail ? (

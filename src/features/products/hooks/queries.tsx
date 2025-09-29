@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { PRODUCT_KEYS } from "../api/product.keys";
 import { getProducts } from "../api/product.api";
-import { toProduct } from "../api/product.mappers";
+import { mapProductDtoToVM } from "../mappers";
 
 export const useGetProducts = () =>
   useQuery({
@@ -9,6 +9,6 @@ export const useGetProducts = () =>
     queryFn: getProducts,
     select: (data) => ({
       ...data,
-      products: data.products.map(toProduct),
+      products: data.products.map(mapProductDtoToVM),
     }),
   });

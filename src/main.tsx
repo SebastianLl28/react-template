@@ -5,6 +5,9 @@ import QueryProvider from "./app/providers/react-query.tsx";
 import ToasterProvider from "./app/providers/toaster.tsx";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./app/route/routes.tsx";
+import bearerInterceptor from "./app/interceptors/auth/bearerInterceptor.ts";
+
+bearerInterceptor();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

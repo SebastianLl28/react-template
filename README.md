@@ -63,143 +63,135 @@ src/
   main.tsx                 # bootstrap (providers + router)
 ```
 
-**Dependency rules**
+## 📐 Types and Models Architecture
 
-- `shared` → must not depend on `features/pages/app`
-- `features` → can use `shared`, must not import `app`
-- `pages` → compose `features` + `shared`
-- `app` → setup only (providers/router/layouts), no business logic
+In this project we differentiate between **DTOs, Entities, Mappers, and View Models** to keep the application scalable and maintainable:
 
-## 🧱 UI with shadcn
+### 🔹 **DTOs (Data Transfer Objects)**
 
-The shadcn CLI is configured to generate components in `src/shared/ui`.
-You can tweak this in `components.json`.
+- **Plain interfaces or types**.
+- Represent how data is transferred between **frontend ↔ backend**.
+- **Contain no logic**, only structure.
 
 Example:
 
-```tsx
-import { Button } from "@/shared/ui/button";
-```
-
-## 🌐 HTTP client
-
-`src/shared/config/apiClient.ts` exports an Axios instance with `baseURL = VITE_API_URL`.
-Response **normalization** is done per feature (mappers or via the hook `select`).
-
-## 🧩 Feature pattern (example: `products`)
-
-**DTOs (backend)**
-
 ```ts
-// features/products/api/types.ts
-export type ProductDTO = { id: number; title: string; price: number /* ... */ };
-export type ProductsListDTO = {
-  products: ProductDTO[];
-  total: number;
-  skip: number;
-  limit: number;
-};
-```
-
-**Mapper (DTO → domain)**
-
-```ts
-// features/products/api/product.mappers.ts
-import type { ProductDTO } from "./types";
-import type { Product } from "../model/Product";
-
-export const toProduct = (dto: ProductDTO): Product => ({
-  id: dto.id,
-  title: dto.title,
-  price: dto.price,
-  // ...
-});
-```
-
-**Query keys**
-
-```ts
-// features/products/api/product.keys.ts
-export const PRODUCT_KEYS = {
-  all: ["products"] as const,
-  list: (q?: string) => ["products", "list", q ?? ""] as const,
-  detail: (id: number) => ["products", "detail", id] as const,
-};
-```
-
-**Hook (normalize with `select`)**
-
-```ts
-// features/products/hooks/queries.ts
-import { useQuery } from "@tanstack/react-query";
-import { PRODUCT_KEYS } from "../api/product.keys";
-import { api } from "@/shared/config/apiClient";
-import { toProduct } from "../api/product.mappers";
-import type { ProductsListDTO } from "../api/types";
-
-export function useProducts(q?: string) {
-  return useQuery({
-    queryKey: PRODUCT_KEYS.list(q),
-    queryFn: async () => {
-      const url = q
-        ? `/products/search?q=${encodeURIComponent(q)}`
-        : "/products";
-      const { data } = await api.get<ProductsListDTO>(url);
-      return data;
-    },
-    select: (dto) => ({
-      items: dto.products.map(toProduct),
-      total: dto.total,
-      skip: dto.skip,
-      limit: dto.limit,
-    }),
-    staleTime: 60_000,
-  });
-}
-```
-
-**UI**
-
-```tsx
-// features/products/ui/ProductCard.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-
-export function ProductCard({
-  title,
-  price,
-  thumbnail,
-}: {
+export type ProductDTO = {
+  id: number;
   title: string;
   price: number;
-  thumbnail?: string;
-}) {
-  return (
-    <Card className="overflow-hidden">
-      {thumbnail ? (
-        <img src={thumbnail} className="h-40 w-full object-cover" />
-      ) : (
-        <div className="h-40 bg-muted" />
-      )}
-      <CardHeader className="p-3">
-        <CardTitle className="text-base line-clamp-1">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="px-3 pb-3 text-sm text-muted-foreground">
-        S/ {price.toFixed(2)}
-      </CardContent>
-    </Card>
-  );
+  discountPercentage: number;
+};
+```
+
+---
+
+### 🔹 **Entities**
+
+- Represent the **business core** on the frontend.
+- Implemented as **classes** that encapsulate **business rules, calculations, and invariants**.
+- Independent from API or UI, so they are reusable and testable.
+
+Example:
+
+```ts
+class Product {
+  constructor(
+    public readonly id: number,
+    public title: string,
+    public price: number,
+    public discountPercentage: number
+  ) {}
+
+  get discountedPrice(): number {
+    return this.price * (1 - this.discountPercentage / 100);
+  }
+
+  get isExpensive(): boolean {
+    return this.price > 1000;
+  }
 }
 ```
 
-## ➕ Create a new feature (checklist)
+---
 
-1. `features/<feature>/api/`: `types.ts`, `<feature>.mappers.ts`, `<feature>.keys.ts`, `<feature>.api.ts`
-2. `features/<feature>/model/`: domain types and `*.store.ts` (Zustand) if needed
-3. `features/<feature>/hooks/`: `queries.ts` / `mutations.ts`
-4. `features/<feature>/ui/`: presentational components
-5. `features/<feature>/pages/`: feature pages (optional)
-6. `features/<feature>/index.ts`: public barrel
-7. Add the route in `app/route/routes.tsx`
+### 🔹 **Mappers**
+
+- Responsible for **transforming DTOs into Entities** and vice versa.
+- Handle **format conversion only**, not business logic.
+
+Example:
+
+```ts
+export const toProductEntity = (dto: ProductDTO): Product =>
+  new Product(dto.id, dto.title, dto.price, dto.discountPercentage);
+```
+
+---
+
+### 🔹 **View Models (optional)**
+
+- Adapt an **Entity** to a specific view or component.
+- Provide UI-ready props (formatted text, flags, labels).
+- Contain **presentation logic only**, never business logic.
+
+Example:
+
+```ts
+export type ProductCardVM = {
+  title: string;
+  formattedPrice: string;
+  discounted: boolean;
+};
+```
+
+---
+
+### 🔹 **Full Flow (Scenarios)**
+
+1. **Simple listing / read-only data**
+
+   - No calculations, just showing backend data.
+   - **Flow:**
+
+   ```
+   Backend (JSON) → DTO → Component
+   ```
+
+   Use DTOs directly, maybe with a mapper if you just want type safety.
+
+2. **Formatting / presentation only**
+
+   - You need to show labels, format dates, prices, etc.
+   - **Flow:**
+
+   ```
+   Backend (JSON) → DTO → Mapper → ViewModel → Component
+   ```
+
+   Here you don’t need business rules, just presentation helpers.
+
+3. **Business p>rules or calculations**
+
+   - You need logic like discounts, stock validation, domain rules.
+   - **Flow:**
+
+   ```
+   Backend (JSON) → DTO → Mapper → Entity → Component
+   ```
+
+   Entities encapsulate rules (`discountedPrice`, `canAddToCart`, etc.).
+
+4. **Complex + UI adaptation**
+
+   - Both **business rules** and **presentation logic** are needed.
+   - **Flow:**
+
+   ```
+   Backend (JSON) → DTO → Mapper → Entity → ViewModel → Component
+   ```
+
+   Example: Cart total (Entity rule) + “formatted currency” (ViewModel).
 
 ## 📜 License
 
